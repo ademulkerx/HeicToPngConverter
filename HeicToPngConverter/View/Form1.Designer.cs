@@ -35,6 +35,7 @@
             progressBar = new ProgressBar();
             flowLayoutPanelImages = new FlowLayoutPanel();
             panel1 = new Panel();
+            pictureBox1 = new PictureBox();
             numericUpDown1 = new NumericUpDown();
             label1 = new Label();
             txtBaseName = new TextBox();
@@ -43,6 +44,7 @@
             btnClose = new DevExpress.XtraEditors.SimpleButton();
             LblVersion = new Label();
             panel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
             ((System.ComponentModel.ISupportInitialize)numericUpDown1).BeginInit();
             panel2.SuspendLayout();
             SuspendLayout();
@@ -104,6 +106,7 @@
             // panel1
             // 
             panel1.BorderStyle = BorderStyle.FixedSingle;
+            panel1.Controls.Add(pictureBox1);
             panel1.Controls.Add(numericUpDown1);
             panel1.Controls.Add(label1);
             panel1.Controls.Add(txtBaseName);
@@ -119,6 +122,17 @@
             panel1.Name = "panel1";
             panel1.Size = new Size(911, 528);
             panel1.TabIndex = 6;
+            // 
+            // pictureBox1
+            // 
+            pictureBox1.Image = Properties.Resources.loading_symbol;
+            pictureBox1.Location = new Point(319, 74);
+            pictureBox1.Name = "pictureBox1";
+            pictureBox1.Size = new Size(271, 257);
+            pictureBox1.SizeMode = PictureBoxSizeMode.CenterImage;
+            pictureBox1.TabIndex = 0;
+            pictureBox1.TabStop = false;
+            pictureBox1.Visible = false;
             // 
             // numericUpDown1
             // 
@@ -214,6 +228,7 @@
             Load += Form1_Load;
             panel1.ResumeLayout(false);
             panel1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
             ((System.ComponentModel.ISupportInitialize)numericUpDown1).EndInit();
             panel2.ResumeLayout(false);
             ResumeLayout(false);
@@ -234,5 +249,6 @@
         private TextBox txtBaseName;
         private CheckBox chkRename;
         private NumericUpDown numericUpDown1;
+        private PictureBox pictureBox1;
     }
 }

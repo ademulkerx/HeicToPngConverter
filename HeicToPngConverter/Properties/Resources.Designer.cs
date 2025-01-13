@@ -73,6 +73,16 @@ namespace HeicToPngConverter.Properties {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap loading_symbol {
+            get {
+                object obj = ResourceManager.GetObject("loading_symbol", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap Logo_png {
             get {
                 object obj = ResourceManager.GetObject("Logo_png", resourceCulture);

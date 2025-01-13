@@ -6,6 +6,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using static DevExpress.Xpo.Helpers.AssociatedCollectionCriteriaHelper;
 
 namespace HeicToPngConverter
 {
@@ -18,7 +19,7 @@ namespace HeicToPngConverter
 
         private List<string> heicFilePaths = new List<string>();
 
-        private void btnSelectFiles_Click(object sender, EventArgs e)
+        private async void btnSelectFiles_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
@@ -26,18 +27,36 @@ namespace HeicToPngConverter
                 Multiselect = true
             };
 
+            // Kullanýcý dosya seçip OK'e týkladýðýnda iþlemlere baþla
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                flowLayoutPanelImages.Controls.Clear();
-                heicFilePaths.Clear();
+                // Dosya seçildiyse pictureBox'ý görünür yap ve butonu devre dýþý býrak
+                pictureBox1.Visible = true;
+                btnSelectFiles.Enabled = false;
+                btnConvert.Enabled = false;
 
+                await methotSelectFilef(openFileDialog);
+
+                pictureBox1.Visible = false;
+                btnSelectFiles.Enabled = true;
+                btnConvert.Enabled = true;
+            }
+        }
+
+        public async Task methotSelectFilef(OpenFileDialog openFileDialog)
+        {
+            // Seçim iþlemi tamamlandýðý için flowLayoutPanel'i ve ilgili listeleri temizle
+            flowLayoutPanelImages.Controls.Clear();
+            heicFilePaths.Clear();
+
+            // Arka planda dosya iþleme iþlemini baþlat
+            await Task.Run(() =>
+            {
                 foreach (string file in openFileDialog.FileNames)
                 {
                     heicFilePaths.Add(file);
-
                     try
                     {
-                        // MagickImage ile resmi aç ve küçük önizleme oluþtur
                         using (var image = new MagickImage(file))
                         {
                             image.Resize(new MagickGeometry(100, 100) { IgnoreAspectRatio = false });
@@ -48,47 +67,51 @@ namespace HeicToPngConverter
                                 image.Write(ms);
                                 ms.Position = 0;
 
-                                // Panel oluþtur
-                                Panel panel = new Panel
+                                // UI güncellemesi ana iþ parçacýðýnda yapýlýr
+                                this.Invoke((MethodInvoker)delegate
                                 {
-                                    Width = 110,
-                                    Height = 130,
-                                    Margin = new Padding(5)
-                                };
+                                    Panel panel = new Panel
+                                    {
+                                        Width = 110,
+                                        Height = 130,
+                                        Margin = new Padding(5)
+                                    };
 
-                                // PictureBox oluþtur
-                                PictureBox pb = new PictureBox
-                                {
-                                    Width = 100,
-                                    Height = 100,
-                                    SizeMode = PictureBoxSizeMode.Zoom,
-                                    Image = Image.FromStream(ms),
-                                    Location = new Point(5, 0)
-                                };
+                                    PictureBox pb = new PictureBox
+                                    {
+                                        Width = 100,
+                                        Height = 100,
+                                        SizeMode = PictureBoxSizeMode.Zoom,
+                                        Image = Image.FromStream(ms),
+                                        Location = new Point(5, 0)
+                                    };
 
-                                // Label oluþtur ve dosya adýný ata
-                                Label lbl = new Label
-                                {
-                                    Text = Path.GetFileName(file),
-                                    AutoSize = false,
-                                    TextAlign = ContentAlignment.MiddleCenter,
-                                    Width = 100,
-                                    Height = 30,
-                                    Location = new Point(5, 100)
-                                };
+                                    Label lbl = new Label
+                                    {
+                                        Text = Path.GetFileName(file),
+                                        AutoSize = false,
+                                        TextAlign = ContentAlignment.MiddleCenter,
+                                        Width = 100,
+                                        Height = 30,
+                                        Location = new Point(5, 100)
+                                    };
 
-                                panel.Controls.Add(pb);
-                                panel.Controls.Add(lbl);
-                                flowLayoutPanelImages.Controls.Add(panel);
+                                    panel.Controls.Add(pb);
+                                    panel.Controls.Add(lbl);
+                                    flowLayoutPanelImages.Controls.Add(panel);
+                                });
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        MessageBox.Show($"Resim yüklenirken hata: {ex.Message}");
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            MessageBox.Show($"Resim yüklenirken hata: {ex.Message}");
+                        });
                     }
                 }
-            }
+            });
         }
 
 
@@ -99,26 +122,41 @@ namespace HeicToPngConverter
                 // Form2'yi modal olarak aç ve sonucu al
                 DialogResult result = form2.ShowDialog();
 
-                // Sonucu kontrol et
-                if (result == DialogResult.OK)
+                await methotConvert(result);
+
+            }
+        }
+
+        public async Task methotConvert(DialogResult dialogResult)
+        {
+            // Sonucu kontrol et
+            if (dialogResult == DialogResult.OK)
+            {
+
+                using FolderBrowserDialog folderDialog = new FolderBrowserDialog();
+                if (folderDialog.ShowDialog() != DialogResult.OK)
+                    return;
+
+
+                await Task.Run(() =>
                 {
-                    using FolderBrowserDialog folderDialog = new FolderBrowserDialog();
-                    if (folderDialog.ShowDialog() != DialogResult.OK)
-                        return;
+
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        btnSelectFiles.Enabled = false;
+                        btnConvert.Enabled = false;
+                        pictureBox1.Visible = true;
+
+                        progressBar.Value = 0;
+                        progressBar.Maximum = heicFilePaths.Count;
+                        statusLabel.Text = "Dönüþtürme iþlemi baþladý...";
+                        btnConvert.Enabled = false;
+                    });
+                    
 
                     string outputFolder = folderDialog.SelectedPath;
 
-                    progressBar.Value = 0;
-                    progressBar.Maximum = heicFilePaths.Count;
-                    statusLabel.Text = "Dönüþtürme iþlemi baþladý...";
-                    btnConvert.Enabled = false;
 
-                    // IProgress örneði oluþturma
-                    IProgress<int> progress = new Progress<int>(increment =>
-                    {
-                        // UI thread'de progress bar'ý güncelle
-                        progressBar.Value = Math.Min(progressBar.Maximum, progressBar.Value + increment);
-                    });
 
                     int maxDegreeOfParallelism = Environment.ProcessorCount;
                     SemaphoreSlim semaphore = new SemaphoreSlim(maxDegreeOfParallelism);
@@ -131,77 +169,86 @@ namespace HeicToPngConverter
                     int firstNumber = (int)numericUpDown1.Value;
                     int fileIndex = firstNumber - 1;
 
+
                     foreach (var file in heicFilePaths)
                     {
-                        await semaphore.WaitAsync();
-
-                        var task = Task.Run(() =>
+                        try
                         {
-                            try
+                            string fileName;
+                            if (renameFiles && !string.IsNullOrEmpty(baseName))
                             {
-                                string fileName;
-                                if (renameFiles && !string.IsNullOrEmpty(baseName))
-                                {
-                                    int currentNumber = Interlocked.Increment(ref fileIndex);
-                                    fileName = $"{baseName}_{currentNumber}.png";
-                                }
-                                else
-                                {
-                                    fileName = Path.GetFileNameWithoutExtension(file) + ".png";
-                                }
-
-                                string pngFilePath = Path.Combine(outputFolder, fileName);
-
-                                using (MagickImage image = new MagickImage(file))
-                                {
-                                    image.Format = MagickFormat.Png;
-                                    image.Write(pngFilePath);
-                                }
-
-                                Interlocked.Increment(ref successCount);
+                                int currentNumber = Interlocked.Increment(ref fileIndex);
+                                fileName = $"{baseName}_{currentNumber}.png";
                             }
-                            catch (Exception ex)
+                            else
                             {
-                                lock (errorFiles)
-                                {
-                                    errorFiles.Add($"{file}: {ex.Message}");
-                                }
+                                fileName = Path.GetFileNameWithoutExtension(file) + ".png";
                             }
-                            finally
+
+                            string pngFilePath = Path.Combine(outputFolder, fileName);
+
+                            using (MagickImage image = new MagickImage(file))
                             {
-                                semaphore.Release();
-                                // Ýlerlemeyi bildir
-                                progress.Report(1);
-
+                                image.Format = MagickFormat.Png;
+                                image.Write(pngFilePath);
                             }
-                        });
 
-                        tasks.Add(task);
+                            Interlocked.Increment(ref successCount);
+                        }
+                        catch (Exception ex)
+                        {
+                            lock (errorFiles)
+                            {
+                                errorFiles.Add($"{file}: {ex.Message}");
+                            }
+                        }
+                        finally
+                        {
+
+                            this.Invoke((MethodInvoker)delegate
+                            {
+                                progressBar.Value = Math.Min(progressBar.Maximum, progressBar.Value + 1);
+                            });
+                        }
                     }
 
-                    await Task.WhenAll(tasks);
 
 
-                    btnConvert.Enabled = true;
 
 
                     if (errorFiles.Count > 0)
                     {
-                        bool originalTopMost = this.TopMost;
-                        this.TopMost = false;  // Formu geçici olarak her zaman üstte yap
-                        string errorMessage = "Bazý dosyalar dönüþtürülemedi:\n" + string.Join("\n", errorFiles);
-                        statusLabel.Text = "Dönüþtürme iþlemi bitti...";
-                        MessageBox.Show(errorMessage, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        this.TopMost = originalTopMost;  // Önceki TopMost durumuna geri dön
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            bool originalTopMost = this.TopMost;
+                            this.TopMost = false;  // Formu geçici olarak her zaman üstte yap
+                            string errorMessage = "Bazý dosyalar dönüþtürülemedi:\n" + string.Join("\n", errorFiles);
+                            statusLabel.Text = "Dönüþtürme iþlemi bitti...";
+                            MessageBox.Show(this,errorMessage, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            this.TopMost = originalTopMost;  // Önceki TopMost durumuna geri dön
+                        });
+                        
                     }
                     else
                     {
-                        statusLabel.Text = "Dönüþtürme iþlemi bitti...";
-                        MessageBox.Show("Tüm dosyalar baþarýyla dönüþtürüldü.", "Baþarýlý", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        this.Invoke((MethodInvoker)delegate
+                        {
+                            statusLabel.Text = "Dönüþtürme iþlemi bitti...";
+                            MessageBox.Show(this,"Tüm dosyalar baþarýyla dönüþtürüldü.", "Baþarýlý", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        });
+                        
                     }
 
-                }
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        pictureBox1.Visible = false;
+                        btnSelectFiles.Enabled = true;
+                        btnConvert.Enabled = true;
+                    });
+                   
 
+                });
+                    
             }
         }
 
