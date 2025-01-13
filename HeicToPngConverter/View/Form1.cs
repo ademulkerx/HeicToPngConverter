@@ -1,6 +1,7 @@
 using HeicToPngConverter.View;
 using ImageMagick;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
@@ -129,18 +130,16 @@ namespace HeicToPngConverter
 
         public async Task methotConvert(DialogResult dialogResult)
         {
-            // Sonucu kontrol et
             if (dialogResult == DialogResult.OK)
             {
-
                 using FolderBrowserDialog folderDialog = new FolderBrowserDialog();
                 if (folderDialog.ShowDialog() != DialogResult.OK)
                     return;
 
+                string outputFolder = folderDialog.SelectedPath;
 
-                await Task.Run(() =>
+                await Task.Run(async () =>
                 {
-
                     this.Invoke((MethodInvoker)delegate
                     {
                         btnSelectFiles.Enabled = false;
@@ -150,27 +149,29 @@ namespace HeicToPngConverter
                         progressBar.Value = 0;
                         progressBar.Maximum = heicFilePaths.Count;
                         statusLabel.Text = "Dönüþtürme iþlemi baþladý...";
-                        btnConvert.Enabled = false;
                     });
-                    
-
-                    string outputFolder = folderDialog.SelectedPath;
-
-
 
                     int maxDegreeOfParallelism = Environment.ProcessorCount;
-                    SemaphoreSlim semaphore = new SemaphoreSlim(maxDegreeOfParallelism);
-                    List<Task> tasks = new List<Task>();
-                    List<string> errorFiles = new List<string>();
-                    int successCount = 0;
+                    var errorFiles = new ConcurrentBag<string>();
+                    int progress = 0;
 
-                    bool renameFiles = chkRename.Checked;
-                    string baseName = txtBaseName.Text.Trim();
-                    int firstNumber = (int)numericUpDown1.Value;
-                    int fileIndex = firstNumber - 1;
+                    bool renameFiles = false;
+                    string baseName = string.Empty;
+                    int fileIndex = 0;
 
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        renameFiles = chkRename.Checked;
+                        baseName = txtBaseName.Text.Trim();
+                        fileIndex = (int)numericUpDown1.Value - 1;
+                    });
 
-                    foreach (var file in heicFilePaths)
+                    var parallelOptions = new ParallelOptions
+                    {
+                        MaxDegreeOfParallelism = maxDegreeOfParallelism
+                    };
+
+                    await Parallel.ForEachAsync(heicFilePaths, parallelOptions, async (file, ct) =>
                     {
                         try
                         {
@@ -192,65 +193,53 @@ namespace HeicToPngConverter
                                 image.Format = MagickFormat.Png;
                                 image.Write(pngFilePath);
                             }
-
-                            Interlocked.Increment(ref successCount);
                         }
                         catch (Exception ex)
                         {
-                            lock (errorFiles)
-                            {
-                                errorFiles.Add($"{file}: {ex.Message}");
-                            }
+                            errorFiles.Add($"{file}: {ex.Message}");
                         }
                         finally
                         {
-
+                            int newProgress = Interlocked.Increment(ref progress);
                             this.Invoke((MethodInvoker)delegate
                             {
-                                progressBar.Value = Math.Min(progressBar.Maximum, progressBar.Value + 1);
+                                progressBar.Value = Math.Min(progressBar.Maximum, newProgress);
                             });
                         }
-                    }
+                    });
 
-
-
-
-
-                    if (errorFiles.Count > 0)
+                    this.Invoke((MethodInvoker)delegate
                     {
+                        statusLabel.Text = "Dönüþtürme iþlemi bitti...";
+                        pictureBox1.Visible = false;
+                        btnSelectFiles.Enabled = true;
+                        btnConvert.Enabled = true;
+                    });
+
+                    if (!errorFiles.IsEmpty)
+                    {
+                        string errorMessage = "Bazý dosyalar dönüþtürülemedi:\n" + string.Join("\n", errorFiles);
                         this.Invoke((MethodInvoker)delegate
                         {
                             bool originalTopMost = this.TopMost;
-                            this.TopMost = false;  // Formu geçici olarak her zaman üstte yap
-                            string errorMessage = "Bazý dosyalar dönüþtürülemedi:\n" + string.Join("\n", errorFiles);
-                            statusLabel.Text = "Dönüþtürme iþlemi bitti...";
-                            MessageBox.Show(this,errorMessage, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                            this.TopMost = originalTopMost;  // Önceki TopMost durumuna geri dön
+                            this.TopMost = false;
+                            MessageBox.Show(this, errorMessage, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            this.TopMost = originalTopMost;
                         });
-                        
                     }
                     else
                     {
                         this.Invoke((MethodInvoker)delegate
                         {
-                            statusLabel.Text = "Dönüþtürme iþlemi bitti...";
-                            MessageBox.Show(this,"Tüm dosyalar baþarýyla dönüþtürüldü.", "Baþarýlý", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            MessageBox.Show(this, "Tüm dosyalar baþarýyla dönüþtürüldü.", "Baþarýlý", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         });
-                        
                     }
-
-                    this.Invoke((MethodInvoker)delegate
-                    {
-                        pictureBox1.Visible = false;
-                        btnSelectFiles.Enabled = true;
-                        btnConvert.Enabled = true;
-                    });
-                   
-
                 });
-                    
             }
         }
+
+
+
 
 
         private void btnClose_Click(object sender, EventArgs e)
