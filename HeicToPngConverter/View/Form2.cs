@@ -207,6 +207,8 @@ namespace HeicToPngConverter.View
 
         private int chaseCounter = 0;
         private const int chaseThreshold = 70; // Örneğin, 5 kez kovalanma eşik değeri
+
+
         private void Timer1_Tick(object sender, EventArgs e)
         {
 
